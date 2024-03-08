@@ -1,26 +1,30 @@
-from snake_game import SnakeGameAI,Direction,Point
+from snake_game import SnakeGame,Direction,Point
 import torch
 import numpy as np
 from collections import deque
 import random
 from model import Linear_QNet, QTrainer
 from helper import plot
-
+# set Maximum memory batch size and learning rate
 MAX_MEMORY = 100000
 BATCH_SIZE = 1000
 LR = 0.001
 
+# Initialize Agent class
 class Agent:
 
     def __init__(self):
+        # Initialize no of game
         self.n_games = 0
+        # Select Random epsilon to pick random direction
         self.epsilon = 0 # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(11, 256, 3)
-        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+        self.model = Linear_QNet(11, 256, 3) # Initialize model 
+        self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)# Initilaize Trainer
 
     def get_state(self, game):
+        # Get 11 state value of current state
         head = game.snake[0]
         point_l = Point(head.x - 20, head.y)
         point_r = Point(head.x + 20, head.y)
@@ -67,9 +71,11 @@ class Agent:
         return np.array(state, dtype=int)
 
     def remember(self, state, action, reward, next_state, done):
+        # Update memory values
         self.memory.append((state, action, reward, next_state, done)) # popleft if MAX_MEMORY is reached
 
     def train_long_memory(self):
+        # Train long memory .. all games
         if len(self.memory) > BATCH_SIZE:
             mini_sample = random.sample(self.memory, BATCH_SIZE) # list of tuples
         else:
@@ -81,10 +87,12 @@ class Agent:
         #    self.trainer.train_step(state, action, reward, next_state, done)
 
     def train_short_memory(self, state, action, reward, next_state, done):
+        # Train with individual games
         self.trainer.train_step(state, action, reward, next_state, done)
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
+        # Select random move when beginning and pick only predicted as training goes on
         self.epsilon = 80 - self.n_games
         final_move = [0,0,0]
         if random.randint(0, 200) < self.epsilon:
@@ -100,12 +108,14 @@ class Agent:
 
 
 def train():
+    # Main training Function
+    # initialize Plotting , and the game 
     plot_scores = []
     plot_mean_scores = []
     total_score = 0
     record = 0
     agent = Agent()
-    game = SnakeGameAI()
+    game = SnakeGame()
     while True:
         # get old state
         state_old = agent.get_state(game)
@@ -128,13 +138,13 @@ def train():
             game.reset()
             agent.n_games += 1
             agent.train_long_memory()
-
+            # Save on best score model
             if score > record:
                 record = score
                 agent.model.save()
 
             print('Game', agent.n_games, 'Score', score, 'Record:', record)
-
+            # Plot Graph at the end of each game run
             plot_scores.append(score)
             total_score += score
             mean_score = total_score / agent.n_games
